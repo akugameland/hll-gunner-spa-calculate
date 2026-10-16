@@ -1,0 +1,7 @@
+ayarlar.json
+hata.log
+*.log
+modeller/
+.venv/
+__pycache__/
+*.pyc

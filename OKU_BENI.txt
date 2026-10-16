@@ -1,0 +1,63 @@
+HLL GUNNER SPA CALCULATE: Hell Let Loose SPA nişan yardımcısı (Türkçe / English)
+=================================================================================
+
+NE YAPAR?
+- Bas-konuş tuşuna (varsayılan F9) basılı tut, mesafeyi söyle, bırak.
+    "dört yüz elli"            -> 450 m
+    "dört beş sıfır"           -> 450 m
+    "450 artı 20"              -> 450 m, hedef 20 m yukarıda
+    "300 aşağı 15"             -> 300 m, hedef 15 m aşağıda
+    "iptal"                    -> hedefi siler
+- Program ekranın sağ altındaki nişangâh panelini sürekli okur:
+    ELEVATION (namlunun şu anki MIL değeri), kırmızı MIL (tankın eğimi) ve PRIMARY silah adından tank.
+- Altyazıda namluyu kaç MIL'e getirmen gerektiğini yazar:
+    "202 MIL / ▲ 56 yukarı (şu an 146)"  ->  değere gelince yeşil "202 MIL ✔ ATEŞ".
+- Tank yatınca kırmızı MIL değişir; sonuç kendiliğinden yeniden hesaplanır.
+- Sesi internete göndermez. Ses (Whisper) ve ekran okuma (Windows'un kendi yazı tanıma motoru) bilgisayarda çalışır.
+
+HESAP
+- litku'nun "HLL SPA Calculator" v2.2.4 formülü (HLL Update 21):
+  https://l1tku.github.io/hll-spa-calculator/
+- Sitenin kendi koduyla 3600 durumda karşılaştırıldı, hepsi aynı (test\test_hesap.py).
+  Canlı sitede elle denenen 10 durum da aynı.
+- Oyun güncellenip top balistiği değişirse site güncellenir, buradaki hesap.py de yenilenmelidir.
+
+KURULUM
+- BASLAT.bat'a çift tıkla. İlk açılışta KURULUM.bat'ı kendisi çalıştırır:
+  Python 3.12 yoksa kurar (winget, yönetici izni gerekmez), paketleri ve ses modelini indirir
+  (NVIDIA ekran kartı varsa ~1,6 GB, yoksa ~0,5 GB). Sonraki açılışlarda doğrudan açılır.
+- Aynı Whisper modeli başka bir klasörde zaten varsa (ör. CanYouSpeak), ayarlar.json'a
+  "whisper_klasoru": "<model klasörü>" yazılırsa yeniden indirilmez.
+
+AYARLAR (program penceresi)
+- Dil / Language: Türkçe ya da English. Arayüz, altyazı ve ses tanıma birlikte değişir.
+- Tank: "Otomatik (ekrandan)" silah adından bulur. Bulamazsa ya da yanlış bulursa tankı elle seç.
+- Bas-konuş: tıkla, klavyede bir tuşa ya da farenin orta/yan tuşuna bas.
+- Elle mesafe: yazıp Enter (ses yerine).
+- Yazı boyutu, alttan uzaklık, oyun ekranı numarası (birden çok monitör varsa).
+
+ÖNEMLİ
+- Oyunu "Kenarlıksız pencere" (Borderless) modunda çalıştır. Tam ekranda (exclusive) hiçbir pencere oyunun üstüne çıkamaz.
+- Oyunun arayüz ölçeği çok küçükse yazı tanıma zorlanabilir. "Ekrandan okunan" kutusundan kontrol et.
+
+DOĞRULANMAMIŞ (gerçek oyunda denenmedi)
+- Yalnız Sherman 105 ("105MM HOWITZER") ekran görüntüsüyle denendi. Diğer tankların HUD'daki silah adları tahmin;
+  tank yanlış bulunursa elle seç (ekran.py SILAH_ANAHTARLARI).
+- Eksi kırmızı MIL (ör. -40) yalnız düzenlenmiş görüntüyle denendi.
+- Kırmızı MIL 0 iken HUD'da hiç görünmüyorsa program 0 sayar ve bunu altyazıda yazar.
+- Ses testi Windows'un sentez sesleriyle yapıldı: Türkçe 8 cümlenin 7'si doğru ("yüz seksen" 160 duyuldu),
+  İngilizce 8/8 doğru.
+  Altyazıdaki "Duyulan:" satırından ne anlaşıldığını kontrol et.
+
+DOSYALAR
+hesap.py     sitenin formülü (mesafe + eğim + yükseklik -> MIL)
+ekran.py     nişangâh panelini okur
+konusma.py   mikrofon + Whisper
+sayilar.py   "dört yüz elli artı yirmi" -> (450, 20)
+altyazi.py   tıklamaları geçiren, her zaman önde altyazı
+uygulama.py  ana pencere
+metinler.py  Türkçe / English metinler
+modeli_indir.py  kurulumda ses modelini indirir
+fare.py      fare tuşuyla bas-konuş (CanYouSpeak'ten)
+test\        test_hesap.py, test_sayilar.py, test_ekran.py, test_konusma.py, e2e.py
+hata.log     hata kaydı

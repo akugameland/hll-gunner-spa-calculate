@@ -1,0 +1,6 @@
+*.bat text eol=crlf
+*.py text eol=lf
+*.txt text eol=crlf
+*.md text eol=lf
+*.webp binary
+*.png binary
