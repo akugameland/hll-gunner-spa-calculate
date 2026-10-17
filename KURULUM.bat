@@ -53,6 +53,9 @@ if errorlevel 1 goto hata
 if errorlevel 1 goto hata
 ".venv\Scripts\python.exe" modeli_indir.py
 if errorlevel 1 goto hata
+rem Kurulumun tamamlandigini isaretle: BASLAT.bat yarim kalan kurulumu buna bakarak anlar
+rem Mark setup as complete: BASLAT.bat uses this to detect an interrupted setup
+echo ok> ".venv\kurulum_tamam"
 echo.
 echo Kurulum tamam. BASLAT.bat ile acin.
 echo Setup complete. Start with BASLAT.bat.

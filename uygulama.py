@@ -8,7 +8,9 @@ Hesap: litku'nun HLL SPA Calculator v2.2.4 formülü (hesap.py, MIT).
 import ctypes
 import json
 import logging
+import os
 import queue
+import sys
 import threading
 import time
 import tkinter as tk
@@ -16,6 +18,14 @@ from pathlib import Path
 from tkinter import ttk
 
 import keyboard
+
+# Çift tıklamayla (pythonw) açılınca konsol yok: sys.stdout/stderr None olur ve bir şey yazmaya çalışan her
+# kütüphane çöker. Model indirirken ilerleme çubuğu (tqdm) "'NoneType' object has no attribute 'write'"
+# veriyordu (2026-10-17, kurulumu yarım kalan başka bir bilgisayarda görüldü). Çıktıyı boşluğa yönlendir.
+if sys.stdout is None:
+    sys.stdout = open(os.devnull, "w", encoding="utf-8")
+if sys.stderr is None:
+    sys.stderr = open(os.devnull, "w", encoding="utf-8")
 
 KLASOR = Path(__file__).resolve().parent
 AYAR_DOSYASI = KLASOR / "ayarlar.json"
@@ -272,7 +282,7 @@ class Uygulama:
             self.olaylar.put(("hazir",))
         except Exception as h:  # noqa: BLE001
             logging.exception("ses hazırlığı")
-            self.olaylar.put(("durum", "ses_yok", {"hata": h}, KIRMIZI))
+            self.olaylar.put(("durum", "ses_yok", {"hata": f"{type(h).__name__}: {h}"}, KIRMIZI))
 
     def _mikrofon_secildi(self, _=None):
         ad = self.mik_kutu.get()
