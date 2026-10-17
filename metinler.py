@@ -39,7 +39,11 @@ METIN = {
         "dinliyorum": "● Dinliyorum…",
         "hazir_degil": "Ses henüz hazır değil: {durum}",
         "cok_kisa": "Çok kısa bastın ({sure:.1f} sn): tuşu basılı tutarken konuş, bitince bırak",
-        "ses_duyulmadi": "Ses duyulmadı ({sure:.1f} sn). Mikrofon doğru mu? Şu an: {mik}",
+        "ses_duyulmadi": "Ses duyulmadı ({sure:.1f} sn, seviye {sev:.4f}). Dinlenen: {mik}. "
+                         "Programda \"Mikrofonu bul\" düğmesine bas ve konuş",
+        "bul": "Mikrofonu bul", "bul_konus": "Konuş… (3 sn)",
+        "bul_secildi": "Ses gelen mikrofon seçildi: {ad}",
+        "bul_yok": "Hiçbir mikrofondan ses gelmedi. Windows: Ayarlar → Gizlilik → Mikrofon → masaüstü uygulamalarına izin ver",
         "son_bas_satir": "Son bas-konuş: {saat} · {sure:.1f} sn · ses seviyesi {sev:.3f}",
         "son_bas_yok": "Bas-konuş tuşu henüz algılanmadı",
         "yonetici_uyari": "Öndeki pencere (oyun) yönetici olarak çalışıyor: tuşların programa ulaşmaz. "
@@ -94,7 +98,11 @@ METIN = {
         "dinliyorum": "● Listening…",
         "hazir_degil": "Speech is not ready yet: {durum}",
         "cok_kisa": "Pressed too briefly ({sure:.1f} s): keep holding the key while you speak",
-        "ses_duyulmadi": "No speech heard ({sure:.1f} s). Is the right microphone selected? Now: {mik}",
+        "ses_duyulmadi": "No speech heard ({sure:.1f} s, level {sev:.4f}). Listening to: {mik}. "
+                         "Press \"Find microphone\" in the app and speak",
+        "bul": "Find microphone", "bul_konus": "Speak… (3 s)",
+        "bul_secildi": "Selected the microphone with sound: {ad}",
+        "bul_yok": "No sound from any microphone. Windows: Settings → Privacy → Microphone → allow desktop apps",
         "son_bas_satir": "Last push-to-talk: {saat} · {sure:.1f} s · level {sev:.3f}",
         "son_bas_yok": "Push-to-talk key not detected yet",
         "yonetici_uyari": "The window in front (the game) runs as administrator: your keys can't reach the app. "

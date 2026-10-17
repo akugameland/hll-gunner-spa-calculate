@@ -32,16 +32,28 @@ def bekle():                                     # ses gerçekten hazır olana k
         app.kok.after(500, bekle)
 
 
-def adim2():
-    for ad, pcm in (("çok kısa", np.zeros(1600, np.float32)), ("sessiz", np.zeros(16000, np.float32))):
+DURUMLAR = [("çok kısa", np.zeros(1600, np.float32)), ("sessiz", np.zeros(16000, np.float32)),
+            ("gürültü", np.random.default_rng(1).normal(0, 0.003, 16000).astype(np.float32))]
+
+
+def adim2(i=0):                                  # ses kontrolü ayrı iş parçacığında: sonucu bekle
+    if i < len(DURUMLAR):
+        ad, pcm = DURUMLAR[i]
         app.mikrofon.bitir = lambda pcm=pcm: pcm
         app._tus_isle(True)
         app._tus_isle(False)
-        sonuclar.append((ad, altyazi()))
+        app.kok.after(1500, lambda: (sonuclar.append((ad, altyazi())), adim2(i + 1)))
+        return
     uygulama.yetki.tuslar_engelli_mi = lambda: True
     app._engel_zamani = 0
     sonuclar.append(("oyun yönetici", altyazi()))
     sonuclar.append(("kutu", app.okunan.cget("text").splitlines()[-1]))
+    app._mikrofon_bul()                          # gerçek mikrofonlar, 3 sn
+    app.kok.after(4500, bitir)
+
+
+def bitir():
+    sonuclar.append(("mikrofonu bul", [app.duyulan[0], app.bul_dugme.cget("text"), app.mik_kutu.get()]))
     for ad, satir in sonuclar:
         print(f"[{ad}] {satir}")
     app.kapat()

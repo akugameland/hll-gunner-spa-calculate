@@ -56,7 +56,7 @@ tick "Add python.exe to PATH") and run `KURULUM.bat` again.
 
 **Nothing happens when you press the key?** Alt+Tab to the app window: the "Last push-to-talk" line shows
 whether the key was detected. If the game runs as administrator a red warning appears: right-click `BASLAT.bat`
-→ Run as administrator. "No speech heard" means the wrong microphone is selected. Details are in `hata.log`
+→ Run as administrator. "No speech heard": the bar under the microphone box should move when you talk; if not, press **Find microphone** and speak for 3 seconds (the mic with sound is picked; quiet mics are boosted automatically). Details are in `hata.log`
 (each push-to-talk is logged with its duration, level and the recognized text; never other keys or audio).
 
 Not tested in the real game yet for every tank: only the Sherman 105 HUD ("105MM HOWITZER") was

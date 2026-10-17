@@ -42,6 +42,7 @@ import ctranslate2  # noqa: E402
 import pyaudiowpatch as pyaudio  # noqa: E402
 from faster_whisper import WhisperModel  # noqa: E402
 from faster_whisper.tokenizer import Tokenizer  # noqa: E402
+from faster_whisper.vad import VadOptions, get_speech_timestamps  # noqa: E402
 
 HIZ = 16000
 PARCA = 1600                    # 100 ms
@@ -127,6 +128,13 @@ class Tanima:
         return self._tk.decode([t for t in r.sequences_ids[0] if t < self._tk.eot]).strip()
 
 
+def _yonlendirici_mi(ad: str) -> bool:
+    """MME'nin "Microsoft Sound Mapper - Input" (Türkçe Windows: "Microsoft Ses Eşleyicisi - Giriş") aygıtı
+    gerçek mikrofon değil, varsayılana yönlendiren takma ad: listede ve mikrofon bulmada atlanır."""
+    k = ad.lower()
+    return "mapper" in k or "eşleyici" in k
+
+
 class Mikrofon:
     """Hep açık durur; tuşa basılınca toplanmaya başlar (önceki 300 ms dahil)."""
 
@@ -145,11 +153,14 @@ class Mikrofon:
         self._kilit = threading.Lock()
         self._once = collections.deque(maxlen=ON_KAYIT)
         self._kayit: list[bytes] | None = None
+        self.anlik = 0.0                     # son 100 ms'nin ses seviyesi (canlı seviye çubuğu için)
         self._akis = self._pa.open(format=pyaudio.paInt16, channels=1, rate=HIZ, input=True,
                                    input_device_index=idx, frames_per_buffer=PARCA,
                                    stream_callback=self._geri)
 
     def _geri(self, veri, kare, zaman, durum):
+        a = np.frombuffer(veri, np.int16).astype(np.float32) / 32768.0
+        self.anlik = float(np.sqrt(np.mean(a * a))) if len(a) else 0.0
         with self._kilit:
             if self._kayit is not None:
                 self._kayit.append(veri)
@@ -181,19 +192,74 @@ class Mikrofon:
             mme = pa.get_host_api_info_by_type(pyaudio.paMME)["index"]
             return sorted({pa.get_device_info_by_index(i)["name"] for i in range(pa.get_device_count())
                            if pa.get_device_info_by_index(i)["hostApi"] == mme
-                           and pa.get_device_info_by_index(i)["maxInputChannels"] > 0})
+                           and pa.get_device_info_by_index(i)["maxInputChannels"] > 0
+                           and not _yonlendirici_mi(pa.get_device_info_by_index(i)["name"])})
         finally:
             pa.terminate()
 
 
 EN_KISA_SN = 0.35
-EN_DUSUK_SEVIYE = 0.004
+SESSIZ_TEPE = 0.0005           # tepe bunun altındaysa gerçekten ses yok (sıfırlar: yanlış aygıt / kapalı mikrofon)
+HEDEF_TEPE = 0.6
+EN_COK_KAZANC = 60.0
 
 
 def seviye(pcm: np.ndarray) -> float:
     return float(np.sqrt(np.mean(pcm * pcm))) if len(pcm) else 0.0
 
 
-def ses_var_mi(pcm: np.ndarray) -> bool:
-    """Çok kısa ya da sessiz kayıt Whisper'a gitmesin (sessizlikte söz uyduruyor)."""
-    return len(pcm) >= HIZ * EN_KISA_SN and seviye(pcm) > EN_DUSUK_SEVIYE
+def hazirla(pcm: np.ndarray) -> tuple[np.ndarray | None, str]:
+    """Kaydı Whisper'a hazırlar: (yükseltilmiş ses, "") ya da (None, "kisa" | "sessiz").
+
+    2026-10-17 kullanıcı: "sesimi duymadığını söylüyor oysa Discord'da ses verebiliyorum". Eskiden sabit
+    bir eşik (RMS 0,004) vardı; Discord sesi kendisi yükselttiği için kısık mikrofon orada duyuluyor,
+    burada eşiğin altında kalıyordu. Şimdi ses tepesi HEDEF_TEPE'ye yükseltilir (en çok 60 kat) ve konuşma
+    olup olmadığına konuşma algılayıcı (Silero, faster-whisper ile gelir) karar verir: gürültü Whisper'a
+    gidip söz uydurulmasın."""
+    if len(pcm) < HIZ * EN_KISA_SN:
+        return None, "kisa"
+    tepe = float(np.max(np.abs(pcm))) if len(pcm) else 0.0
+    if tepe < SESSIZ_TEPE:
+        return None, "sessiz"
+    ses = (pcm * min(HEDEF_TEPE / tepe, EN_COK_KAZANC)).astype(np.float32)
+    if not get_speech_timestamps(ses, VadOptions(min_silence_duration_ms=300, speech_pad_ms=200)):
+        return None, "sessiz"
+    return ses, ""
+
+
+def mikrofon_bul(sure: float = 3.0) -> list[tuple[str, float]]:
+    """Bütün mikrofonları aynı anda `sure` saniye dinler; [(ad, ses seviyesi)] büyükten küçüğe.
+    Kullanıcı konuşurken çağrılır: sesin geldiği mikrofon en üstte çıkar."""
+    pa = pyaudio.PyAudio()
+    akislar, toplam = [], {}
+    try:
+        mme = pa.get_host_api_info_by_type(pyaudio.paMME)["index"]
+        for i in range(pa.get_device_count()):
+            d = pa.get_device_info_by_index(i)
+            if (d["hostApi"] != mme or d["maxInputChannels"] <= 0 or d["name"] in toplam
+                    or _yonlendirici_mi(d["name"])):
+                continue
+            ad = d["name"]
+            toplam[ad] = []
+
+            def geri(veri, kare, zaman, durum, ad=ad):
+                toplam[ad].append(veri)
+                return None, pyaudio.paContinue
+            try:
+                akislar.append(pa.open(format=pyaudio.paInt16, channels=1, rate=HIZ, input=True,
+                                       input_device_index=i, frames_per_buffer=PARCA, stream_callback=geri))
+            except Exception:  # noqa: BLE001
+                log.info("mikrofon açılamadı (atlandı): %s", ad)
+        import time
+        time.sleep(sure)
+    finally:
+        for a in akislar:
+            try:
+                a.stop_stream()
+                a.close()
+            except Exception:  # noqa: BLE001
+                pass
+        pa.terminate()
+    sonuc = [(ad, seviye(np.frombuffer(b"".join(v), np.int16).astype(np.float32) / 32768.0))
+             for ad, v in toplam.items() if v]
+    return sorted(sonuc, key=lambda x: -x[1])

@@ -33,6 +33,7 @@ AYARLAR (program penceresi)
 - Dil / Language: Türkçe ya da English. Arayüz, altyazı ve ses tanıma birlikte değişir.
 - Tank: "Otomatik (ekrandan)" silah adından bulur. Bulamazsa ya da yanlış bulursa tankı elle seç.
 - Bas-konuş: tıkla, klavyede bir tuşa ya da farenin orta/yan tuşuna bas.
+- Mikrofon: liste + canlı seviye çubuğu + "Mikrofonu bul" (konuşurken sesin geldiği mikrofonu seçer).
 - Elle mesafe: yazıp Enter (ses yerine).
 - Yazı boyutu, alttan uzaklık, oyun ekranı numarası (birden çok monitör varsa).
 
@@ -48,7 +49,10 @@ SORUN GİDERME
      programı kapat, BASLAT.bat'a sağ tıkla → Yönetici olarak çalıştır.
   3) Oyunun kullandığı bir tuşu (ör. Alt) seçtiysen oyunda boş bir tuş ya da farenin yan tuşunu dene.
 - "Ses henüz hazır değil": ses modeli yükleniyor ya da iniyor, program penceresindeki durum satırını bekle.
-- "Ses duyulmadı": programda doğru mikrofonu seç. "Son bas-konuş" satırındaki ses seviyesi 0.004'ün altındaysa ses gelmiyor.
+- "Ses duyulmadı": program Windows'un varsayılan mikrofonunu dinler; Discord'da başka bir mikrofon seçili olabilir.
+  Mikrofon kutusunun altındaki çubuk konuşurken dolmalı. Dolmuyorsa "Mikrofonu bul"a bas ve 3 saniye konuş:
+  sesin geldiği mikrofon seçilir. Kısık mikrofon sorun değil, ses kendiliğinden yükseltilir.
+  Hiçbir mikrofondan ses gelmiyorsa: Windows Ayarlar → Gizlilik → Mikrofon → masaüstü uygulamalarına izin ver.
 - Ayrıntı hata.log dosyasında (her bas-konuş süresi, ses seviyesi ve anlaşılan sözle yazılır; diğer tuşların ve sesin kendisi yazılmaz).
 
 DOĞRULANMAMIŞ (gerçek oyunda denenmedi)

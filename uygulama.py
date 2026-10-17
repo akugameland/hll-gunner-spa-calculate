@@ -87,6 +87,13 @@ class Uygulama:
         stil = ttk.Style()
         stil.theme_use("clam")
         stil.configure("TCombobox", fieldbackground=KUTU, background=KUTU, foreground=ON)
+        # salt okunur kutu clam temasında açık gri zemin + gri yazı oluyordu (okunmuyordu)
+        stil.map("TCombobox", fieldbackground=[("readonly", KUTU)], foreground=[("readonly", ON)],
+                 selectbackground=[("readonly", KUTU)], selectforeground=[("readonly", ON)],
+                 background=[("readonly", "#3a3d46")], arrowcolor=[("readonly", ON)])
+        self.kok.option_add("*TCombobox*Listbox.background", KUTU)
+        self.kok.option_add("*TCombobox*Listbox.foreground", ON)
+        self.kok.option_add("*TCombobox*Listbox.selectBackground", "#3a3d46")
 
         self.hedef: tuple[int, int] | None = None       # (mesafe, yükseklik farkı)
         self.okuma = ekran.Okuma()
@@ -170,10 +177,20 @@ class Uygulama:
         self.tus_dugme.grid(row=2, column=1, sticky="ew")
 
         etiket(self.m("mikrofon"), 3)
-        self.mik_kutu = ttk.Combobox(cerceve, state="readonly", values=[self.m("varsayilan_mik")] + self._mikrofonlar)
+        mik = tk.Frame(cerceve, bg=ARKA)
+        mik.grid(row=3, column=1, sticky="ew")
+        mik.columnconfigure(0, weight=1)
+        self.mik_kutu = ttk.Combobox(mik, state="readonly", values=[self.m("varsayilan_mik")] + self._mikrofonlar)
         self.mik_kutu.set(self.ayar["mikrofon"] or self.m("varsayilan_mik"))
-        self.mik_kutu.grid(row=3, column=1, sticky="ew")
+        self.mik_kutu.grid(row=0, column=0, columnspan=2, sticky="ew")
         self.mik_kutu.bind("<<ComboboxSelected>>", self._mikrofon_secildi)
+        # Canlı seviye: konuşunca çubuk dolmuyorsa yanlış mikrofon dinleniyor
+        self.seviye_cubuk = tk.Canvas(mik, height=14, bg=KUTU, highlightthickness=0)
+        self.seviye_cubuk.grid(row=1, column=0, sticky="ew", pady=(4, 0))
+        self.seviye_dolgu = self.seviye_cubuk.create_rectangle(0, 0, 0, 14, width=0, fill=GRI)
+        self.bul_dugme = tk.Button(mik, text=self.m("bul"), command=self._mikrofon_bul, bg=KUTU, fg=ON,
+                                   relief="flat", activebackground="#3a3d46", activeforeground=ON)
+        self.bul_dugme.grid(row=1, column=1, sticky="e", padx=(6, 0), pady=(4, 0))
 
         etiket(self.m("elle"), 4)
         elle = tk.Frame(cerceve, bg=ARKA)
@@ -332,22 +349,68 @@ class Uygulama:
         sure, sev = len(pcm) / self._konusma.HIZ, self._konusma.seviye(pcm)
         self.son_kayit = (time.strftime("%H:%M:%S"), sure, sev)
         logging.info("bas-konuş: %.2f sn, ses seviyesi %.4f, mikrofon %s", sure, sev, self.mikrofon.ad)
-        if not self._konusma.ses_var_mi(pcm):
-            anahtar = "cok_kisa" if sure < self._konusma.EN_KISA_SN else "ses_duyulmadi"
-            self.duyulan = (self.m(anahtar, sure=sure, mik=self.mikrofon.ad), time.time(), KIRMIZI)
-            self._gecmise(self.m(anahtar, sure=sure, mik=self.mikrofon.ad))
-            return
         self.cozuluyor = True
+        mik = self.mikrofon.ad
 
         def coz():
             try:
-                metin = self.tanima.yaziya(pcm)
+                ses, sebep = self._konusma.hazirla(pcm)     # konuşma algılayıcı: arayüzü bekletmesin
+                if ses is None:
+                    logging.info("bas-konuş reddedildi: %s", sebep)
+                    self.olaylar.put(("ses_yok", sebep, sure, sev, mik))
+                    return
+                metin = self.tanima.yaziya(ses)
             except Exception:  # noqa: BLE001
                 logging.exception("whisper")
                 metin = ""
             logging.info("duyulan: %r", metin)
             self.olaylar.put(("duyulan", metin))
         threading.Thread(target=coz, daemon=True).start()
+
+    def _ses_yok(self, sebep: str, sure: float, sev: float, mik: str):
+        self.cozuluyor = False
+        anahtar = "cok_kisa" if sebep == "kisa" else "ses_duyulmadi"
+        metin = self.m(anahtar, sure=sure, mik=mik, sev=sev)
+        self.duyulan = (metin, time.time(), KIRMIZI)
+        self._gecmise(metin)
+
+    # ── mikrofonu bul ────────────────────────────────────────────────────────
+    def _mikrofon_bul(self):
+        if getattr(self, "_bul_suruyor", False) or not konusma:
+            return
+        self._bul_suruyor = True
+        self.bul_dugme.config(text=self.m("bul_konus"), state="disabled")
+
+        def calis():
+            try:
+                self.olaylar.put(("bulundu", konusma.mikrofon_bul(3.0)))
+            except Exception:  # noqa: BLE001
+                logging.exception("mikrofon bulma")
+                self.olaylar.put(("bulundu", []))
+        threading.Thread(target=calis, daemon=True).start()
+
+    def _bulundu(self, liste: list):
+        self._bul_suruyor = False
+        self.bul_dugme.config(text=self.m("bul"), state="normal")
+        logging.info("mikrofon bul: %s", ", ".join(f"{a}={s:.4f}" for a, s in liste))
+        if not liste or liste[0][1] < 0.002:
+            self._gecmise(self.m("bul_yok"))
+            self.duyulan = (self.m("bul_yok"), time.time(), KIRMIZI)
+            return
+        ad = liste[0][0]
+        self.mik_kutu.set(ad)
+        self._mikrofon_secildi()
+        self._gecmise(self.m("bul_secildi", ad=ad))
+        self.duyulan = (self.m("bul_secildi", ad=ad), time.time(), YESIL)
+
+    def _seviye_ciz(self):
+        """Canlı mikrofon seviye çubuğu (logaritmik: kısık mikrofon da görünsün)."""
+        import math
+        sev = self.mikrofon.anlik if self.mikrofon else 0.0
+        oran = 0.0 if sev <= 1e-5 else min(1.0, max(0.0, (20 * math.log10(sev) + 60) / 54))   # -60..-6 dBFS
+        g = int(self.seviye_cubuk.winfo_width() or 1)
+        self.seviye_cubuk.coords(self.seviye_dolgu, 0, 0, int(g * oran), 14)
+        self.seviye_cubuk.itemconfig(self.seviye_dolgu, fill=YESIL if oran > 0.25 else SARI if oran > 0.05 else GRI)
 
     def _soz_isle(self, metin: str, kaynak: str):
         self.cozuluyor = False
@@ -442,6 +505,10 @@ class Uygulama:
                             self.son_tank = o.tank
                 elif tur == "tus_durum":
                     self._tus_isle(veri[0])
+                elif tur == "ses_yok":
+                    self._ses_yok(*veri)
+                elif tur == "bulundu":
+                    self._bulundu(veri[0])
                 elif tur == "duyulan":
                     self._soz_isle(veri[0], self.m("duyulan"))
                 elif tur == "durum":
@@ -461,6 +528,7 @@ class Uygulama:
         except Exception:  # noqa: BLE001
             logging.exception("olay işleme")
         try:
+            self._seviye_ciz()
             self._goster()
         except Exception:  # noqa: BLE001
             logging.exception("gösterim")
