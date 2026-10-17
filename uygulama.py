@@ -31,6 +31,8 @@ KLASOR = Path(__file__).resolve().parent
 AYAR_DOSYASI = KLASOR / "ayarlar.json"
 logging.basicConfig(filename=KLASOR / "hata.log", level=logging.INFO, encoding="utf-8",
                     format="%(asctime)s %(levelname)s %(name)s: %(message)s")
+for _gurultu in ("httpx", "httpx2", "httpcore", "huggingface_hub"):        # her HTTP isteğini kayda yazmasın
+    logging.getLogger(_gurultu).setLevel(logging.WARNING)
 
 try:
     ctypes.windll.shcore.SetProcessDpiAwareness(2)     # ekran yakalama doğru bölgeyi alsın, yazı bulanık olmasın
@@ -48,6 +50,7 @@ import altyazi  # noqa: E402
 import ekran  # noqa: E402
 import hesap  # noqa: E402
 import sayilar  # noqa: E402
+import yetki  # noqa: E402
 from fare import DUGMELER, FareDinleyici  # noqa: E402
 from metinler import DIL_ADLARI, t, varsayilan_dil  # noqa: E402
 
@@ -98,6 +101,10 @@ class Uygulama:
         self._calisiyor = True
         self.tanima = None
         self.mikrofon = None
+        self.son_bas = 0.0
+        self.son_kayit: tuple[str, float, float] | None = None
+        self._engel = False                                # oyun yönetici, biz değiliz: tuşlar gelmez
+        self._engel_zamani = 0.0
         self._durum = ("yukleniyor", {}, GRI)               # dil değişince yeniden yazılabilsin
         self._mikrofonlar: list[str] = []
         self._gecmis: list[str] = []
@@ -307,7 +314,14 @@ class Uygulama:
         self.olaylar.put(("tus_durum", basili))
 
     def _tus_isle(self, basili: bool):
+        """Hiçbir durum sessiz geçmez (2026-10-17 kullanıcı "tuşa basıyorum bir şey olmuyor" dedi):
+        model hazır değilse, ses çok kısa ya da sessizse altyazıda kırmızı uyarı çıkar ve kayda yazılır."""
+        if basili:
+            self.son_bas = time.time()
         if not self.mikrofon or not self.tanima:
+            if basili:
+                logging.info("bas-konuş basıldı ama ses hazır değil: %s", self.durum.cget("text"))
+                self.duyulan = (self.m("hazir_degil", durum=self.durum.cget("text")), time.time(), KIRMIZI)
             return
         if basili:
             self.dinliyor = True
@@ -315,7 +329,13 @@ class Uygulama:
             return
         self.dinliyor = False
         pcm = self.mikrofon.bitir()
+        sure, sev = len(pcm) / self._konusma.HIZ, self._konusma.seviye(pcm)
+        self.son_kayit = (time.strftime("%H:%M:%S"), sure, sev)
+        logging.info("bas-konuş: %.2f sn, ses seviyesi %.4f, mikrofon %s", sure, sev, self.mikrofon.ad)
         if not self._konusma.ses_var_mi(pcm):
+            anahtar = "cok_kisa" if sure < self._konusma.EN_KISA_SN else "ses_duyulmadi"
+            self.duyulan = (self.m(anahtar, sure=sure, mik=self.mikrofon.ad), time.time(), KIRMIZI)
+            self._gecmise(self.m(anahtar, sure=sure, mik=self.mikrofon.ad))
             return
         self.cozuluyor = True
 
@@ -325,6 +345,7 @@ class Uygulama:
             except Exception:  # noqa: BLE001
                 logging.exception("whisper")
                 metin = ""
+            logging.info("duyulan: %r", metin)
             self.olaylar.put(("duyulan", metin))
         threading.Thread(target=coz, daemon=True).start()
 
@@ -455,9 +476,19 @@ class Uygulama:
             self.m("nisangah", durum=self.m("gorunuyor" if gorunuyor else "gorunmuyor")),
             self.m("okunan_satir", elev=o.yukselis if gorunuyor else "—",
                    kirmizi=o.kirmizi if gorunuyor and o.kirmizi is not None else "—"),
-            self.m("silah_satir", silah=o.silah or "—", tank=self.tank_adi(tank) if tank else self.m("bulunamadi")))))
+            self.m("silah_satir", silah=o.silah or "—", tank=self.tank_adi(tank) if tank else self.m("bulunamadi")),
+            self.m("son_bas_satir", saat=self.son_kayit[0], sure=self.son_kayit[1], sev=self.son_kayit[2])
+            if self.son_kayit else self.m("son_bas_yok"))))
+        if simdi - self._engel_zamani > 1.0:
+            self._engel_zamani = simdi
+            engel = yetki.tuslar_engelli_mi()
+            if engel and not self._engel:
+                logging.warning("öndeki pencere yönetici olarak çalışıyor, program değil: bas-konuş tuşu görünmez")
+            self._engel = engel
 
         satirlar = []
+        if self._engel:
+            satirlar.append((self.m("yonetici_uyari"), KIRMIZI, 0.5, True))
         if self.duyulan and simdi - self.duyulan[1] < DUYULAN_SN:
             satirlar.append((self.duyulan[0], self.duyulan[2], 0.5, False))
         if self.dinliyor:

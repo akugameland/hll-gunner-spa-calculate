@@ -40,6 +40,17 @@ AYARLAR (program penceresi)
 - Oyunu "Kenarlıksız pencere" (Borderless) modunda çalıştır. Tam ekranda (exclusive) hiçbir pencere oyunun üstüne çıkamaz.
 - Oyunun arayüz ölçeği çok küçükse yazı tanıma zorlanabilir. "Ekrandan okunan" kutusundan kontrol et.
 
+SORUN GİDERME
+- Tuşa basınca altyazıda hiçbir şey çıkmıyorsa:
+  1) Oyun "Kenarlıksız pencere" modunda mı? Tam ekranda altyazı görünmez. Alt+Tab ile program penceresine bak:
+     "Son bas-konuş" satırı ve Geçmiş listesi tuşun algılanıp algılanmadığını gösterir.
+  2) "Bas-konuş tuşu henüz algılanmadı" yazıyorsa ve oyun yönetici olarak çalışıyorsa altyazıda kırmızı uyarı çıkar:
+     programı kapat, BASLAT.bat'a sağ tıkla → Yönetici olarak çalıştır.
+  3) Oyunun kullandığı bir tuşu (ör. Alt) seçtiysen oyunda boş bir tuş ya da farenin yan tuşunu dene.
+- "Ses henüz hazır değil": ses modeli yükleniyor ya da iniyor, program penceresindeki durum satırını bekle.
+- "Ses duyulmadı": programda doğru mikrofonu seç. "Son bas-konuş" satırındaki ses seviyesi 0.004'ün altındaysa ses gelmiyor.
+- Ayrıntı hata.log dosyasında (her bas-konuş süresi, ses seviyesi ve anlaşılan sözle yazılır; diğer tuşların ve sesin kendisi yazılmaz).
+
 DOĞRULANMAMIŞ (gerçek oyunda denenmedi)
 - Yalnız Sherman 105 ("105MM HOWITZER") ekran görüntüsüyle denendi. Diğer tankların HUD'daki silah adları tahmin;
   tank yanlış bulunursa elle seç (ekran.py SILAH_ANAHTARLARI).
@@ -58,6 +69,7 @@ altyazi.py   tıklamaları geçiren, her zaman önde altyazı
 uygulama.py  ana pencere
 metinler.py  Türkçe / English metinler
 modeli_indir.py  kurulumda ses modelini indirir
+yetki.py     oyun yönetici olarak mı çalışıyor (tuşlar gelmez uyarısı)
 fare.py      fare tuşuyla bas-konuş (CanYouSpeak'ten)
 test\        test_hesap.py, test_sayilar.py, test_ekran.py, test_konusma.py, e2e.py
 hata.log     hata kaydı

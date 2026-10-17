@@ -65,10 +65,19 @@ def model_hazirla(ek_klasor: str = "") -> bool:
         model_indir()
         return True
     if ctranslate2.get_cuda_device_count() == 0:
-        WhisperModel("Systran/faster-whisper-small", device="cpu", compute_type="int8",
-                     download_root=str(KLASOR / "modeller" / "whisper-small"),
-                     revision="536b0662742c02347bc0e980a01041f333bce120")
+        kucuk_model()
     return False
+
+
+def kucuk_model() -> "WhisperModel":
+    """İşlemci modeli. Önce yalnız diskten açılır: indirildikten sonra her açılışta internete sorulmasın
+    (2026-10-17 hata.log'da her açılışta Hugging Face istekleri görüldü). Diskte yoksa bir kez indirilir."""
+    ayar = dict(device="cpu", compute_type="int8", download_root=str(KLASOR / "modeller" / "whisper-small"),
+                revision="536b0662742c02347bc0e980a01041f333bce120")
+    try:
+        return WhisperModel("Systran/faster-whisper-small", local_files_only=True, **ayar)
+    except Exception:  # noqa: BLE001
+        return WhisperModel("Systran/faster-whisper-small", **ayar)
 
 
 def model_indir():
@@ -93,9 +102,7 @@ class Tanima:
             except Exception:  # noqa: BLE001
                 log.exception("whisper cuda açılamadı, işlemciye düşülüyor")
         if self.cihaz is None:
-            self.model = WhisperModel("Systran/faster-whisper-small", device="cpu", compute_type="int8",
-                                      download_root=str(KLASOR / "modeller" / "whisper-small"),
-                                      revision="536b0662742c02347bc0e980a01041f333bce120")
+            self.model = kucuk_model()
             self.cihaz = "cpu"
         self.dil_ayarla(dil)
 
@@ -179,8 +186,14 @@ class Mikrofon:
             pa.terminate()
 
 
+EN_KISA_SN = 0.35
+EN_DUSUK_SEVIYE = 0.004
+
+
+def seviye(pcm: np.ndarray) -> float:
+    return float(np.sqrt(np.mean(pcm * pcm))) if len(pcm) else 0.0
+
+
 def ses_var_mi(pcm: np.ndarray) -> bool:
     """Çok kısa ya da sessiz kayıt Whisper'a gitmesin (sessizlikte söz uyduruyor)."""
-    if len(pcm) < HIZ * 0.35:
-        return False
-    return float(np.sqrt(np.mean(pcm * pcm))) > 0.004
+    return len(pcm) >= HIZ * EN_KISA_SN and seviye(pcm) > EN_DUSUK_SEVIYE

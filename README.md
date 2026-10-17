@@ -54,6 +54,11 @@ tick "Add python.exe to PATH") and run `KURULUM.bat` again.
    say the distance, release.
 3. Raise/lower the gun until the subtitle says **✔ FIRE**.
 
+**Nothing happens when you press the key?** Alt+Tab to the app window: the "Last push-to-talk" line shows
+whether the key was detected. If the game runs as administrator a red warning appears: right-click `BASLAT.bat`
+→ Run as administrator. "No speech heard" means the wrong microphone is selected. Details are in `hata.log`
+(each push-to-talk is logged with its duration, level and the recognized text; never other keys or audio).
+
 Not tested in the real game yet for every tank: only the Sherman 105 HUD ("105MM HOWITZER") was
 verified from a screenshot. If the tank is detected wrong, pick it manually in the app.
 
