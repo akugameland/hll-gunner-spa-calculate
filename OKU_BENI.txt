@@ -26,6 +26,18 @@ KURULUM
 - BASLAT.bat'a çift tıkla. İlk açılışta KURULUM.bat'ı kendisi çalıştırır:
   Python 3.12 yoksa kurar (winget, yönetici izni gerekmez), paketleri ve ses modelini indirir
   (NVIDIA ekran kartı varsa ~1,6 GB, yoksa ~0,5 GB). Sonraki açılışlarda doğrudan açılır.
+- Silip yeniden kurmak güvenli. KURULUM.bat her adımı denetler ve yazar:
+    [TAMAM] hazır, atlandı   [UYARI] eksik/yarım, tamamlanıyor   [HATA] tamamlanamadı (mesajı okuyun)
+  * Python ortamı (.venv) sağlamsa yeniden kurulmaz.
+  * Paketler sürümleriyle denetlenir; hepsi doğruysa pip hiç çalışmaz, eksik olan tek paket kurulur.
+  * Ses modeli program klasörünün DIŞINDA durur: %LOCALAPPDATA%\HLLGunner\modeller
+    Program klasörünü silip yeniden kursan da model bir daha inmez.
+  * İndirme bitince dosya boyutları kaydedilir. Yarım kalan ya da bozulan model algılanır ve kaldığı yerden
+    tamamlanır (yalnız eksik/bozuk dosyalar iner).
+  * Kurulum yarıda kesilirse BASLAT.bat bunu anlar ve kurulumu yeniden çalıştırır.
+- Takılan bir şey olursa KURULUM.bat'ı yeniden çalıştırmak yeterli; hiçbir şeyi baştan indirmez.
+- Tamamen kaldırmak için KALDIR.bat: Python ortamını ve indirilen ses modellerini siler (program dosyaları ve
+  ayarlar.json kalır). Yalnız yeniden kurmak için KALDIR.bat'a gerek yok.
 - Aynı Whisper modeli başka bir klasörde zaten varsa (ör. CanYouSpeak), ayarlar.json'a
   "whisper_klasoru": "<model klasörü>" yazılırsa yeniden indirilmez.
 
@@ -72,7 +84,8 @@ sayilar.py   "dört yüz elli artı yirmi" -> (450, 20)
 altyazi.py   tıklamaları geçiren, her zaman önde altyazı
 uygulama.py  ana pencere
 metinler.py  Türkçe / English metinler
-modeli_indir.py  kurulumda ses modelini indirir
+kurulum_denetim.py  kurulumda her parçayı denetler, eksik/yarım olanı tamamlar
+KALDIR.bat   Python ortamını ve ses modellerini siler
 yetki.py     oyun yönetici olarak mı çalışıyor (tuşlar gelmez uyarısı)
 fare.py      fare tuşuyla bas-konuş (CanYouSpeak'ten)
 test\        test_hesap.py, test_sayilar.py, test_ekran.py, test_konusma.py, e2e.py

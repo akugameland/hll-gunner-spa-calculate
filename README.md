@@ -43,6 +43,14 @@ cases (6 tanks × 20 distances × 6 tilts × 5 height differences): all identica
    is missing (via winget, no admin rights needed), the packages and the speech model.
 3. Next times, `BASLAT.bat` opens the app directly.
 
+**Reinstalling is safe.** `KURULUM.bat` checks every step and prints `[TAMAM]` (OK) / `[UYARI]` (fixing) /
+`[HATA]` (error): a healthy Python environment is kept, pip only runs when a package is missing or has the
+wrong version, and the speech model is stored outside the program folder (`%LOCALAPPDATA%\HLLGunner`), so
+deleting the folder and installing again does not download it again. After a download its file sizes are
+recorded; an interrupted or damaged download is detected and completed from where it stopped. If setup is
+interrupted, `BASLAT.bat` notices and runs it again. To remove everything (environment + models), run
+`KALDIR.bat`.
+
 If Python can't be installed automatically, install
 [Python 3.12.10](https://www.python.org/downloads/release/python-31210/) ("Windows installer (64-bit)",
 tick "Add python.exe to PATH") and run `KURULUM.bat` again.
@@ -86,7 +94,8 @@ kurulumda modelin bir kez indirilmesi için kullanılır. Ekranın yalnız sağ 
 görüntü kaydedilmez. Oyunun belleğine ya da dosyalarına dokunmaz.
 
 **Kurulum:** Depoyu indir (Code → Download ZIP), klasöre çıkar, `BASLAT.bat`'a çift tıkla. İlk açılışta
-Python 3.12'yi (yoksa), paketleri ve ses modelini kendisi kurar. Oyunu **Kenarlıksız pencere** modunda çalıştır.
+Python 3.12'yi (yoksa), paketleri ve ses modelini kendisi kurar. Oyunu **Kenarlıksız pencere** modunda çalıştır. Silip yeniden kurmak güvenli: kurulum her adımı denetler, hazır olanı atlar, yarım kalanı tamamlar.
+Ses modeli program klasörü dışında (`%LOCALAPPDATA%\HLLGunner`) durur, yeniden inmez. Tamamen kaldırmak için `KALDIR.bat`.
 
 Ayrıntılı kullanım: [OKU_BENI.txt](OKU_BENI.txt)
 

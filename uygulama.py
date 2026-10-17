@@ -297,9 +297,12 @@ class Uygulama:
                 raise RuntimeError(KONUSMA_HATA)
             self._konusma = konusma
             self.olaylar.put(("mikrofonlar", konusma.Mikrofon.liste()))
-            if konusma.ctranslate2.get_cuda_device_count() > 0 and konusma.model_yolu(self.ayar["whisper_klasoru"]) is None:
-                self.olaylar.put(("durum", "indiriliyor", {}, GRI))     # kurulum indirmediyse (normalde indirir)
-                konusma.model_indir()
+            ek = self.ayar["whisper_klasoru"]
+            eksik = (konusma.model_yolu(ek) is None if konusma.gereken_model() == "turbo"
+                     else not konusma.model_tam_mi(konusma.model_klasoru("small")))
+            if eksik:                                       # kurulum indirmediyse (normalde kurulum indirir)
+                self.olaylar.put(("durum", "indiriliyor", {}, GRI))
+                konusma.model_hazirla(ek)
             self.mikrofon = konusma.Mikrofon(self.ayar["mikrofon"])
             self.tanima = konusma.Tanima(self.ayar["dil"], self.ayar["whisper_klasoru"])
             self.tanima.yaziya(__import__("numpy").zeros(8000, "float32"))     # ilk çağrı yavaş: ısıt

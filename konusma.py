@@ -1,8 +1,11 @@
 """Bas-konuş: tuş basılıyken mikrofonu kaydeder, bırakınca Whisper ile yazıya çevirir (internetsiz).
 
-Model: whisper large-v3-turbo (CanYouSpeak ile aynı). modeller/whisper-turbo içinde ya da ayarlar.json'daki
-"whisper_klasoru" yolunda aranır; yoksa kurulumda indirilir (~1,6 GB). Ekran kartı yoksa işlemcide 'small'
-modele düşer.
+Model: ekran kartı (NVIDIA) varsa whisper large-v3-turbo (~1,6 GB, CanYouSpeak ile aynı), yoksa whisper small
+(~480 MB, işlemci). Modeller program klasörünün DIŞINDA, %LOCALAPPDATA% altındaki HLLGunner/modeller içinde durur:
+program klasörü silinip yeniden kurulsa da model bir kez iner (2026-10-17 kullanıcı sık sık silip kuruyordu).
+İndirme bitince dosya boyutları indirme_tamam.json'a yazılır; bu kayıt yoksa ya da boyutlar tutmuyorsa model
+yarım sayılır ve indirme kaldığı yerden sürer. ayarlar.json'daki "whisper_klasoru" ile başka bir yerdeki aynı
+model de kullanılabilir.
 
 Hız: CanYouSpeak'teki ölçüme göre (GTX 1650) Whisper sesi 30 sn'ye tamamlayınca kodlama ~1,75 sn sürüyor.
 Kısa sözü 10 sn'lik pencerede kodlamak ~0,4 sn. Burada da CTranslate2 doğrudan kullanılır, dil seçilen
@@ -19,8 +22,10 @@ from pathlib import Path
 import numpy as np
 
 KLASOR = Path(__file__).resolve().parent
-YEREL_MODEL = KLASOR / "modeller" / "whisper-turbo"
-os.environ.setdefault("HF_HOME", str(KLASOR / "modeller" / ".hf"))
+VERI = Path(os.environ.get("HLL_GUNNER_VERI") or Path(os.environ.get("LOCALAPPDATA") or KLASOR) / "HLLGunner")
+MODEL_KOK = VERI / "modeller"
+ESKI_MODEL = KLASOR / "modeller" / "whisper-turbo"          # eski sürümlerin indirdiği yer (varsa kullanılır)
+os.environ.setdefault("HF_HOME", str(VERI / ".hf"))
 os.environ.setdefault("HF_HUB_DISABLE_TELEMETRY", "1")
 
 log = logging.getLogger("konusma")
@@ -51,42 +56,83 @@ ON_KAYIT = 3                    # tuşa basmadan önceki 300 ms de alınır (ilk
 IPUCU = {"tr": " Mesafe metre cinsinden.", "en": " Distance in meters."}
 
 
+# Sürümler sabit: depo sonradan değişse bile test edilen dosyalar iner. Yalnız ağırlık ve json/txt iner.
+MODELLER = {
+    "turbo": dict(depo="mobiuslabsgmbh/faster-whisper-large-v3-turbo",
+                  surum="0a363e9161cbc7ed1431c9597a8ceaf0c4f78fcf", klasor="whisper-turbo", boyut="~1,6 GB"),
+    "small": dict(depo="Systran/faster-whisper-small",
+                  surum="536b0662742c02347bc0e980a01041f333bce120", klasor="whisper-small", boyut="~480 MB"),
+}
+IZINLI = ["*.json", "*.bin", "*.txt"]
+KAYIT = "indirme_tamam.json"
+
+
+def model_klasoru(ad: str) -> Path:
+    return MODEL_KOK / MODELLER[ad]["klasor"]
+
+
+def _dosyalar(yol: Path) -> dict[str, int]:
+    return {f.name: f.stat().st_size for f in yol.iterdir() if f.is_file() and f.name != KAYIT}
+
+
+def model_tam_mi(yol: Path) -> bool:
+    """İndirme bitmiş ve sonradan bozulmamış mı (kayıttaki her dosya var ve boyutu aynı)?"""
+    import json
+    try:
+        kayit = json.loads((yol / KAYIT).read_text(encoding="utf-8"))
+        simdi = _dosyalar(yol)
+        return bool(kayit) and "model.bin" in kayit and all(simdi.get(ad) == b for ad, b in kayit.items())
+    except (OSError, ValueError):
+        return False
+
+
+def model_indir(ad: str) -> Path:
+    """Yarım kalmış indirme kaldığı yerden sürer (huggingface_hub .incomplete dosyalarını tamamlar)."""
+    import json
+    from huggingface_hub import snapshot_download
+    m, yol = MODELLER[ad], model_klasoru(ad)
+    yol.mkdir(parents=True, exist_ok=True)
+    (yol / KAYIT).unlink(missing_ok=True)
+    snapshot_download(m["depo"], revision=m["surum"], local_dir=str(yol), allow_patterns=IZINLI)
+    if not (yol / "model.bin").exists():
+        raise RuntimeError(f"model indirilemedi: {m['depo']}")
+    (yol / KAYIT).write_text(json.dumps(_dosyalar(yol), indent=1), encoding="utf-8")
+    return yol
+
+
+def gereken_model() -> str:
+    return "turbo" if ctranslate2.get_cuda_device_count() > 0 else "small"
+
+
 def model_yolu(ek_klasor: str = "") -> Path | None:
-    """ek_klasor: ayarlar.json'daki "whisper_klasoru" (başka bir programın indirdiği aynı model)."""
-    for yol in [YEREL_MODEL] + ([Path(ek_klasor)] if ek_klasor else []):
-        if (yol / "model.bin").exists():
+    """Kullanılabilir turbo model. ek_klasor: ayarlar.json'daki "whisper_klasoru"."""
+    if model_tam_mi(model_klasoru("turbo")):
+        return model_klasoru("turbo")
+    for yol in [ESKI_MODEL] + ([Path(ek_klasor)] if ek_klasor else []):
+        if (yol / "model.bin").exists() and (yol / "config.json").exists():
             return yol
     return None
 
 
 def model_hazirla(ek_klasor: str = "") -> bool:
-    """Gereken modeli indirir; bir şey indiyse True. Ekran kartı yoksa büyük model inmez
-    ('small' model Tanima açılırken kendisi iner, ~480 MB)."""
-    if ctranslate2.get_cuda_device_count() > 0 and model_yolu(ek_klasor) is None:
-        model_indir()
+    """Gereken modeli indirir (yoksa ya da yarımsa); bir şey indiyse True."""
+    if gereken_model() == "turbo":
+        if model_yolu(ek_klasor) is None:
+            model_indir("turbo")
+            return True
+        return False
+    if not model_tam_mi(model_klasoru("small")):
+        model_indir("small")
         return True
-    if ctranslate2.get_cuda_device_count() == 0:
-        kucuk_model()
     return False
 
 
 def kucuk_model() -> "WhisperModel":
-    """İşlemci modeli. Önce yalnız diskten açılır: indirildikten sonra her açılışta internete sorulmasın
-    (2026-10-17 hata.log'da her açılışta Hugging Face istekleri görüldü). Diskte yoksa bir kez indirilir."""
-    ayar = dict(device="cpu", compute_type="int8", download_root=str(KLASOR / "modeller" / "whisper-small"),
-                revision="536b0662742c02347bc0e980a01041f333bce120")
-    try:
-        return WhisperModel("Systran/faster-whisper-small", local_files_only=True, **ayar)
-    except Exception:  # noqa: BLE001
-        return WhisperModel("Systran/faster-whisper-small", **ayar)
-
-
-def model_indir():
-    """Sürüm sabit: depo sonradan değişse bile test edilen dosyalar iner."""
-    from huggingface_hub import snapshot_download
-    snapshot_download("mobiuslabsgmbh/faster-whisper-large-v3-turbo", local_dir=str(YEREL_MODEL),
-                      revision="0a363e9161cbc7ed1431c9597a8ceaf0c4f78fcf",          # CanYouSpeak ile aynı
-                      allow_patterns=["*.json", "*.bin", "*.txt", "README.md"])    # çalıştırılabilir dosya inmesin
+    """İşlemci modeli: yalnız diskten açılır (her açılışta internete sorulmaz); yoksa bir kez indirilir."""
+    yol = model_klasoru("small")
+    if not model_tam_mi(yol):
+        model_indir("small")
+    return WhisperModel(str(yol), device="cpu", compute_type="int8")
 
 
 class Tanima:
